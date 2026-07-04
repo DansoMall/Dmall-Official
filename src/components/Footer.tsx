@@ -51,7 +51,7 @@ export default function Footer() {
 
         {/* Brand */}
         <div>
-          <img src="/favicon.png" alt="DMall" className="w-16 h-16 rounded-2xl mb-4" />
+          <img src="/dmall-logo-cropped.png" alt="DMall" className="h-28 w-auto mb-4 drop-shadow-lg" />
           <p className="text-[13px] text-white/70 leading-relaxed">
             Ghana&apos;s favourite online marketplace. Shop millions of products with fast delivery across Ghana.
           </p>

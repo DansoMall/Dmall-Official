@@ -11,8 +11,9 @@ interface Props {
 }
 
 export default function StarRating({ rating, maxStars = 5, reviewCount, size = 14, showCount = false }: Props) {
+  const safeRating = Math.min(Math.max(Number.isFinite(rating) ? rating : 0, 0), maxStars);
   const stars = Array.from({ length: maxStars }, (_, i) => {
-    const val = rating - i;
+    const val = safeRating - i;
     if (val >= 1) return 'full';
     if (val >= 0.5) return 'half';
     return 'empty';

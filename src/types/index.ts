@@ -1,7 +1,7 @@
 export type UserRole = 'customer' | 'vendor' | 'admin';
 export type ProductCondition = 'new' | 'used' | 'refurbished';
-export type OrderStatus = 'placed' | 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled';
-export type PaymentMethod = 'mtn_momo' | 'vodafone_cash' | 'airteltigo_money' | 'card' | 'danso_pay' | 'cash_on_delivery';
+export type OrderStatus = 'placed' | 'processing' | 'shipped' | 'out_for_delivery' | 'delivered' | 'cancelled' | 'returned';
+export type PaymentMethod = 'mtn_momo' | 'vodafone_cash' | 'airteltigo';
 export type DeliveryMethod = 'door' | 'station';
 export type MoMoNetwork = 'mtn' | 'vodafone' | 'airteltigo';
 
@@ -49,6 +49,7 @@ export interface Product {
 }
 
 export interface CartItem {
+  cartItemId?: number;
   productId: string;
   product: Product;
   qty: number;

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import PageTransition from '@/components/PageTransition';
 import BottomTabBar from '@/components/BottomTabBar';
+import AppInit from '@/components/AppInit';
 
 export const metadata: Metadata = {
   title: "D Mall — Ghana's Favourite Online Marketplace",
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen bg-background text-text-primary">
+        <AppInit />
         <PageTransition>
           {/* pb-16 on mobile gives breathing room above the bottom tab bar */}
           <div className="pb-16 md:pb-0">

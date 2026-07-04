@@ -29,10 +29,8 @@ export default function AboutPage() {
           className="px-6 py-12 text-center"
           style={{ background: 'linear-gradient(135deg, #003152 0%, #0a5a8e 100%)' }}
         >
-          <div className="bg-white rounded-3xl px-6 py-3 inline-block mb-2">
-            <img src="/dmall-logo.png" alt="DMall" className="h-16 w-auto" />
-          </div>
-          <p className="text-[14px] text-white/70">Ghana's Favourite Online Marketplace</p>
+          <img src="/dmall-logo-cropped.png" alt="DMall" className="h-28 w-auto mx-auto mb-2 drop-shadow-lg" />
+          <p className="text-[14px] text-white/70">Ghana&apos;s Favourite Online Marketplace</p>
         </div>
 
         <div className="px-4 py-6 flex flex-col gap-5">
@@ -41,7 +39,7 @@ export default function AboutPage() {
             <p className="text-[16px] font-bold text-text-primary mb-2">Our Mission</p>
             <p className="text-[13px] text-gray-500 leading-relaxed">
               D Mall connects buyers and sellers across Ghana, making commerce simple, fast and trustworthy.
-              We believe every Ghanaian deserves access to quality products at fair prices — whether you're in Accra,
+              We believe every Ghanaian deserves access to quality products at fair prices — whether you&apos;re in Accra,
               Kumasi, Tamale or anywhere in between.
             </p>
           </div>

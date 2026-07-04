@@ -15,8 +15,8 @@ export interface ApiProduct {
   sale_price: string | null;
   effective_price: string;
   discount_percent: number;
-  rating: string;
-  review_count: number;
+  rating: string | number | null;
+  review_count: number | null;
   is_official_store: boolean;
   vendor_name: string;
   category_slug: string;
@@ -54,6 +54,11 @@ export interface PaginatedResponse<T> {
 
 // ── Transformers ─────────────────────────────────────────────────────────────
 
+function toNumber(value: string | number | null | undefined, fallback = 0): number {
+  const num = typeof value === 'number' ? value : parseFloat(value ?? '');
+  return Number.isFinite(num) ? num : fallback;
+}
+
 export function toProduct(p: ApiProduct): Product {
   return {
     id: String(p.id),
@@ -72,8 +77,8 @@ export function toProduct(p: ApiProduct): Product {
     sku: p.slug,
     variants: [],
     condition: p.condition as 'new' | 'used' | 'refurbished',
-    rating: parseFloat(p.rating),
-    reviewCount: p.review_count,
+    rating: toNumber(p.rating),
+    reviewCount: p.review_count ?? 0,
     isOfficialStore: p.is_official_store,
     isFeatured: false,
     status: 'published',
@@ -104,8 +109,8 @@ export function toProductDetail(p: ApiProductDetail): Product {
       options: v.options,
     })),
     condition: p.condition as 'new' | 'used' | 'refurbished',
-    rating: parseFloat(p.rating),
-    reviewCount: p.review_count,
+    rating: toNumber(p.rating),
+    reviewCount: p.review_count ?? 0,
     isOfficialStore: p.is_official_store,
     isFeatured: false,
     status: 'published',

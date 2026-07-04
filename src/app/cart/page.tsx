@@ -6,7 +6,9 @@ import AppHeader from '@/components/AppHeader';
 import CartItemCard from '@/components/CartItemCard';
 import PrimaryButton from '@/components/PrimaryButton';
 import Footer from '@/components/Footer';
-import { useCartStore } from '@/store/cartStore';
+import { useCartStore, type ApiCart } from '@/store/cartStore';
+import { useAuthStore } from '@/store/authStore';
+import { apiClient } from '@/utils/apiClient';
 import { formatPrice } from '@/utils/format';
 import { useRouter } from 'next/navigation';
 
@@ -14,9 +16,45 @@ const SHIPPING_FEE = 25;
 
 export default function CartPage() {
   const router = useRouter();
-  const { items, removeItem, updateQty, clearCart, subtotal } = useCartStore();
+  const { items, removeItem, updateQty, clearCart, syncFromBackend, subtotal } = useCartStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const sub = subtotal();
   const total = sub + SHIPPING_FEE;
+
+  const syncCartResponse = async (res: Response) => {
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    if (data?.items) syncFromBackend(data as ApiCart);
+  };
+
+  const handleRemove = async (productId: string) => {
+    const item = items.find((cartItem) => cartItem.productId === productId);
+    removeItem(productId);
+    if (!isAuthenticated || !item?.cartItemId) return;
+    const res = await apiClient(`/api/cart/remove/${item.cartItemId}/`, { method: 'DELETE' });
+    await syncCartResponse(res);
+  };
+
+  const handleUpdateQty = async (productId: string, qty: number) => {
+    const item = items.find((cartItem) => cartItem.productId === productId);
+    if (qty <= 0) {
+      await handleRemove(productId);
+      return;
+    }
+    updateQty(productId, qty);
+    if (!isAuthenticated || !item?.cartItemId) return;
+    const res = await apiClient(`/api/cart/update/${item.cartItemId}/`, {
+      method: 'PUT',
+      body: JSON.stringify({ quantity: qty }),
+    });
+    await syncCartResponse(res);
+  };
+
+  const handleClearCart = async () => {
+    clearCart();
+    if (!isAuthenticated) return;
+    await apiClient('/api/cart/clear/', { method: 'DELETE' });
+  };
 
   if (items.length === 0) {
     return (
@@ -47,10 +85,10 @@ export default function CartPage() {
           <div className="lg:col-span-2 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <p className="text-[14px] text-text-secondary">{items.length} items in your cart</p>
-              <button onClick={clearCart} className="text-[14px] font-semibold text-danger hover:opacity-80">Clear All</button>
+              <button onClick={handleClearCart} className="text-[14px] font-semibold text-danger hover:opacity-80">Clear All</button>
             </div>
             {items.map((item) => (
-              <CartItemCard key={item.productId} item={item} onRemove={removeItem} onUpdateQty={updateQty} />
+              <CartItemCard key={item.productId} item={item} onRemove={handleRemove} onUpdateQty={handleUpdateQty} />
             ))}
           </div>
 

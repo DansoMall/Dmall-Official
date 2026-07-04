@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Bell, Package, Tag, Megaphone, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Package, Tag, Megaphone, ShieldCheck } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import Footer from '@/components/Footer';
 
@@ -26,6 +26,28 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
 export default function NotificationsPage() {
   const [push, setPush] = useState({ orders: true, deals: true, news: false, security: true });
   const [email, setEmail] = useState({ orders: true, deals: false, news: false, security: true });
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const raw = window.localStorage.getItem('dmall-notification-preferences');
+      if (!raw) return;
+      try {
+        const prefs = JSON.parse(raw);
+        if (prefs.push) setPush(prefs.push);
+        if (prefs.email) setEmail(prefs.email);
+      } catch {
+        // Ignore corrupt local preferences.
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const handleSave = () => {
+    window.localStorage.setItem('dmall-notification-preferences', JSON.stringify({ push, email }));
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1800);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6F9]">
@@ -66,8 +88,15 @@ export default function NotificationsPage() {
           </div>
         </div>
 
-        <button className="w-full h-12 bg-primary text-white rounded-full font-bold text-[15px] hover:bg-primary-dark transition-colors shadow-md">
-          Save Preferences
+        {saved && (
+          <div className="flex items-center gap-2 rounded-2xl bg-green-50 border border-green-100 px-4 py-3">
+            <Check size={16} className="text-success" />
+            <p className="text-[13px] font-semibold text-success">Notification preferences saved.</p>
+          </div>
+        )}
+
+        <button onClick={handleSave} className="w-full h-12 bg-primary text-white rounded-full font-bold text-[15px] hover:bg-primary-dark transition-colors shadow-md">
+          {saved ? 'Saved!' : 'Save Preferences'}
         </button>
       </main>
 

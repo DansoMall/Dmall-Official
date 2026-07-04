@@ -7,11 +7,11 @@ import Footer from '@/components/Footer';
 
 const FAQS = [
   { q: 'How do I track my order?',                   a: 'Go to My Orders, select the order and tap Track. You\'ll see live status updates from our courier partners.' },
-  { q: 'What payment methods do you accept?',         a: 'We accept MTN MoMo, Vodafone Cash, AirtelTigo Money, bank cards (Visa/Mastercard), and D Mall Pay wallet.' },
+  { q: 'What payment methods do you accept?',         a: 'We accept MTN MoMo, Vodafone Cash, and AirtelTigo Money only.' },
   { q: 'Can I return a product?',                     a: 'Yes — you can request a return within 7 days of delivery for eligible items. Visit Returns & Refunds in your account.' },
   { q: 'How long does delivery take?',                a: 'Accra deliveries take 1–2 business days. Other regions take 2–5 business days depending on your location.' },
   { q: 'How do I become a vendor?',                   a: 'Tap Become a Vendor on your Account page and complete the registration. Our team reviews applications within 48 hours.' },
-  { q: 'Is my payment information secure?',           a: 'Yes. All transactions are encrypted with 256-bit SSL. We never store your card or MoMo PIN.' },
+  { q: 'Is my payment information secure?',           a: 'Yes. All transactions are encrypted with 256-bit SSL. We never store your MoMo PIN.' },
 ];
 
 function FAQItem({ q, a }: { q: string; a: string }) {

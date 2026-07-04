@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useState } from 'react';
 import { ShieldCheck, Upload, CheckCircle2, Clock } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import Footer from '@/components/Footer';
@@ -11,17 +12,41 @@ const STEPS = [
 ];
 
 export default function VerificationPage() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState<Record<number, string>>({});
+  const [success, setSuccess] = useState('');
+
+  const openUpload = (stepId: number) => {
+    setActiveStep(stepId);
+    fileRef.current?.click();
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || activeStep === null) return;
+    setSubmitted((s) => ({ ...s, [activeStep]: file.name }));
+    setSuccess('Verification document received. Our team will review it shortly.');
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6F9]">
       <AppHeader title="Identity Verification" showBack showCart />
 
       <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-5 flex flex-col gap-4">
+        <input ref={fileRef} type="file" accept="image/*,.pdf" className="sr-only" onChange={handleFile} />
+
         {/* Status banner */}
-        <div className="bg-yellow-50 border border-yellow-100 rounded-2xl p-5 flex items-start gap-4">
-          <Clock size={22} className="text-yellow-500 shrink-0 mt-0.5" />
+        <div className={`${success ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'} border rounded-2xl p-5 flex items-start gap-4`}>
+          {success ? <CheckCircle2 size={22} className="text-green-500 shrink-0 mt-0.5" /> : <Clock size={22} className="text-yellow-500 shrink-0 mt-0.5" />}
           <div>
-            <p className="text-[14px] font-bold text-yellow-700">Verification Pending</p>
-            <p className="text-[12px] text-yellow-600 mt-0.5">Complete all steps below to unlock higher purchase limits and seller privileges.</p>
+            <p className={`text-[14px] font-bold ${success ? 'text-green-700' : 'text-yellow-700'}`}>
+              {success ? 'Document Submitted' : 'Verification Pending'}
+            </p>
+            <p className={`text-[12px] mt-0.5 ${success ? 'text-green-600' : 'text-yellow-600'}`}>
+              {success || 'Complete all steps below to unlock higher purchase limits and seller privileges.'}
+            </p>
           </div>
         </div>
 
@@ -39,10 +64,20 @@ export default function VerificationPage() {
                 <p className="text-[12px] text-gray-400 mt-0.5">{step.sub}</p>
               </div>
             </div>
-            {step.status === 'pending' && (
-              <button className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-white h-11 rounded-xl font-semibold text-[14px] hover:bg-primary-dark transition-colors">
-                <Upload size={15} /> Upload Documents
-              </button>
+            {(step.status === 'pending' || submitted[step.id]) && (
+              <>
+                {submitted[step.id] && (
+                  <p className="mt-3 text-[12px] font-semibold text-success bg-green-50 rounded-xl px-3 py-2">
+                    Uploaded: {submitted[step.id]}
+                  </p>
+                )}
+                <button
+                  onClick={() => openUpload(step.id)}
+                  className="mt-4 w-full flex items-center justify-center gap-2 bg-primary text-white h-11 rounded-xl font-semibold text-[14px] hover:bg-primary-dark transition-colors"
+                >
+                  <Upload size={15} /> {submitted[step.id] ? 'Replace Document' : 'Upload Documents'}
+                </button>
+              </>
             )}
           </div>
         ))}

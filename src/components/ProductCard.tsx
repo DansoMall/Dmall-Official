@@ -83,6 +83,7 @@ export default function ProductCard({ product, variant = 'grid' }: Props) {
       </div>
       <div className="p-2 flex flex-col gap-1">
         <p className="text-[13px] font-medium text-text-primary line-clamp-2 leading-[18px]">{product.name}</p>
+        <StarRating rating={product.rating} reviewCount={product.reviewCount} size={12} showCount />
         <PriceDisplay salePrice={product.salePrice} originalPrice={product.originalPrice} discountPercent={product.discountPercent} size="sm" showBadge={false} />
       </div>
     </Link>

@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { gsap } from 'gsap';
 import {
   User, MapPin, ShieldCheck, Heart, ShoppingBag, RotateCcw,
   Bell, Info, LogOut, ChevronRight, Store, Camera,
-  X, Check, Package, Truck, Edit3, Upload,
+  X, Check, Package, Truck, Edit3, Upload, Loader2, AlertCircle,
 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import Footer from '@/components/Footer';
 import { useAuthStore } from '@/store/authStore';
 import { useCartStore } from '@/store/cartStore';
+import { apiGet, apiPatch } from '@/utils/apiClient';
 import { formatPrice } from '@/utils/format';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -21,53 +22,73 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_BG: Record<string, string> = {
   delivered: '#EDFAF4', processing: '#FEF9EC', placed: '#EBF2F8', cancelled: '#FDECEA',
 };
-const MOCK_ORDERS = [
-  { id: 'DM-A3X8', date: '24 Jun 2026', items: 2, status: 'delivered', total: 245 },
-  { id: 'DM-B7K2', date: '20 Jun 2026', items: 1, status: 'processing', total: 125 },
-  { id: 'DM-C9P5', date: '15 Jun 2026', items: 3, status: 'delivered', total: 380 },
-];
+
+interface ApiOrder {
+  id: number;
+  order_number: string;
+  status: string;
+  payment_status: string;
+  total_amount: string;
+  item_count: number;
+  created_at: string;
+  first_item?: { name: string; image: string | null };
+}
 
 // ─── Edit Profile Sheet ──────────────────────────────────────────────────────
-// Uses CSS transitions (no GSAP display toggling) to avoid timing races.
-// Always in the DOM; opacity + translateY control visibility.
 function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user, updateUser } = useAuthStore();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef  = useRef<HTMLInputElement>(null);
+  const fileObj  = useRef<File | null>(null);
 
-  const [form, setForm]     = useState({ name: '', email: '', phone: '', location: '' });
-  const [avatar, setAvatar] = useState<string | undefined>(undefined);
-  const [saving, setSaving] = useState(false);
-  const [saved,  setSaved]  = useState(false);
+  const [form, setForm]     = useState({ name: '', phone: '' });
+  const [preview, setPreview] = useState<string | undefined>(undefined);
+  const [saving, setSaving]   = useState(false);
+  const [saved,  setSaved]    = useState(false);
+  const [error,  setError]    = useState('');
 
-  // Populate from store whenever sheet opens
   useEffect(() => {
-    if (open && user) {
-      setForm({
-        name:     user.name     ?? '',
-        email:    user.email    ?? '',
-        phone:    user.phone    ?? '',
-        location: user.location ?? '',
-      });
-      setAvatar(user.avatar);
+    if (!open || !user) return;
+    const timer = window.setTimeout(() => {
+      setForm({ name: user.name ?? '', phone: user.phone ?? '' });
+      setPreview(user.avatar);
+      fileObj.current = null;
       setSaved(false);
-    }
+      setError('');
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, user]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    fileObj.current = file;
     const reader = new FileReader();
-    reader.onload = () => setAvatar(reader.result as string);
+    reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
-    setSaving(true);
-    await new Promise((r) => setTimeout(r, 700));
-    updateUser({ name: form.name, email: form.email, phone: form.phone, location: form.location, avatar });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => { setSaved(false); onClose(); }, 1100);
+    if (!form.name.trim()) { setError('Name is required'); return; }
+    setSaving(true); setError('');
+    try {
+      const body = new FormData();
+      body.append('name',  form.name.trim());
+      body.append('phone', form.phone.trim());
+      if (fileObj.current) body.append('avatar', fileObj.current);
+
+      const updated = await apiPatch<Record<string, unknown>>('/api/auth/me/', body);
+      updateUser({
+        name:   updated.name as string,
+        phone:  updated.phone as string,
+        avatar: (updated.avatar_url as string) ?? preview,
+      });
+      setSaved(true);
+      setTimeout(() => { setSaved(false); onClose(); }, 1000);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const initial = (form.name || user?.name)?.[0]?.toUpperCase() ?? 'U';
@@ -100,26 +121,18 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100 shrink-0">
           <h2 className="text-[18px] font-bold text-text-primary">Edit Profile</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
             <X size={17} />
           </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-5">
-
           {/* Avatar */}
           <div className="flex flex-col items-center gap-2">
             <div className="relative">
-              {avatar ? (
-                <img
-                  src={avatar}
-                  alt="Profile"
-                  className="w-24 h-24 rounded-full object-cover shadow-lg ring-4 ring-primary/20"
-                />
+              {preview ? (
+                <img src={preview} alt="Profile" className="w-24 h-24 rounded-full object-cover shadow-lg ring-4 ring-primary/20" />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-white text-[32px] font-extrabold shadow-lg ring-4 ring-primary/20">
                   {initial}
@@ -132,20 +145,15 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
                 <Camera size={14} className="text-white" />
               </button>
             </div>
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:opacity-75 transition-opacity"
-            >
+            <button onClick={() => fileRef.current?.click()} className="flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:opacity-75">
               <Upload size={13} /> Upload new photo
             </button>
           </div>
 
-          {/* Form fields */}
+          {/* Fields */}
           {([
-            { label: 'Full Name',     key: 'name',     type: 'text',  placeholder: 'Your full name' },
-            { label: 'Email Address', key: 'email',    type: 'email', placeholder: 'your@email.com' },
-            { label: 'Phone Number',  key: 'phone',    type: 'tel',   placeholder: '+233 XX XXX XXXX' },
-            { label: 'Location',      key: 'location', type: 'text',  placeholder: 'e.g. Accra, Greater Accra' },
+            { label: 'Full Name',    key: 'name',  type: 'text', placeholder: 'Your full name' },
+            { label: 'Phone Number', key: 'phone', type: 'tel',  placeholder: '+233 XX XXX XXXX' },
           ] as const).map(({ label, key, type, placeholder }) => (
             <div key={key}>
               <label className="block text-[13px] font-semibold text-text-primary mb-1.5">{label}</label>
@@ -154,10 +162,26 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
                 value={form[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 placeholder={placeholder}
-                className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 bg-gray-50 text-[14px] text-text-primary placeholder:text-gray-400 outline-none focus:border-primary focus:bg-white transition-all"
+                className="w-full h-12 px-4 rounded-xl border-2 border-gray-200 bg-gray-50 text-[14px] outline-none focus:border-primary focus:bg-white transition-all"
               />
             </div>
           ))}
+
+          {/* Email (read-only — must be changed via separate flow) */}
+          <div>
+            <label className="block text-[13px] font-semibold text-text-primary mb-1.5">Email Address</label>
+            <div className="w-full h-12 px-4 rounded-xl border-2 border-gray-100 bg-gray-100 text-[14px] text-gray-400 flex items-center">
+              {user?.email}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">Email cannot be changed here</p>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-3">
+              <AlertCircle size={14} className="text-danger shrink-0" />
+              <p className="text-[13px] text-danger">{error}</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -166,14 +190,12 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
             onClick={handleSave}
             disabled={saving || saved}
             className={`w-full h-12 rounded-full font-bold text-[15px] flex items-center justify-center gap-2 transition-all duration-200 ${
-              saved
-                ? 'bg-green-500 text-white'
-                : 'bg-primary text-white hover:bg-primary-dark active:scale-95'
+              saved ? 'bg-green-500 text-white' : 'bg-primary text-white hover:bg-primary-dark active:scale-95'
             }`}
           >
-            {saved    ? <><Check size={18} /> Saved!</> :
-             saving   ? <span className="animate-pulse">Saving…</span> :
-                        'Save Changes'}
+            {saved   ? <><Check size={18} /> Saved!</> :
+             saving  ? <><Loader2 size={16} className="animate-spin" /> Saving…</> :
+                       'Save Changes'}
           </button>
         </div>
       </div>
@@ -184,13 +206,58 @@ function EditProfileSheet({ open, onClose }: { open: boolean; onClose: () => voi
 // ─── Main Page ───────────────────────────────────────────────────────────────
 export default function AccountPage() {
   const router = useRouter();
-  const { user, isAuthenticated, clearAuth, mockLogin } = useAuthStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const totalItems = useCartStore((s) => s.totalItems());
+
   const [editOpen, setEditOpen] = useState(false);
+  const [orders,   setOrders]   = useState<ApiOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [wishlistCount, setWishlistCount] = useState(0);
+
   const heroRef  = useRef<HTMLDivElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
 
+  // Redirect to auth if not logged in
   useEffect(() => {
+    if (!isAuthenticated) router.replace(`/auth?tab=login&next=${encodeURIComponent('/account')}`);
+  }, [isAuthenticated, router]);
+
+  // Fetch real orders from Django
+  const fetchOrders = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setOrdersLoading(true);
+    try {
+      const data = await apiGet<{ results: ApiOrder[] }>('/api/orders/');
+      setOrders(data.results?.slice(0, 3) ?? []);
+    } catch {
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }, [isAuthenticated]);
+
+  // Fetch wishlist count
+  const fetchWishlistCount = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const data = await apiGet<unknown[]>('/api/wishlist/');
+      setWishlistCount(Array.isArray(data) ? data.length : 0);
+    } catch {
+      setWishlistCount(0);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchOrders();
+      fetchWishlistCount();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchOrders, fetchWishlistCount]);
+
+  // GSAP entrance animations
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const ctx = gsap.context(() => {
       gsap.fromTo(heroRef.current,
         { opacity: 0, y: -20 },
@@ -209,36 +276,21 @@ export default function AccountPage() {
     return () => ctx.revert();
   }, [isAuthenticated]);
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col bg-[#F4F6F9]">
-        <AppHeader title="My Account" showCart />
-        <div className="flex-1 flex flex-col items-center justify-center gap-5 px-8 text-center">
-          <img src="/dmall-logo.png" alt="DMall" className="h-24 w-auto" />
-          <div>
-            <h2 className="text-[22px] font-bold mb-1">Welcome to DMall</h2>
-            <p className="text-text-secondary text-[14px]">Login to track orders, manage your wishlist and more</p>
-          </div>
-          <button
-            onClick={() => mockLogin()}
-            className="bg-primary text-white font-bold px-10 py-3.5 rounded-full hover:bg-primary-dark transition-all shadow-md text-[15px]"
-          >
-            Login / Register
-          </button>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  const handleLogout = async () => {
+    await logout();
+    router.push('/');
+  };
 
-  const initial = user?.name?.[0]?.toUpperCase() ?? 'U';
+  if (!isAuthenticated || !user) return null;
+
+  const initial = user.name?.[0]?.toUpperCase() ?? 'U';
+
+  const formatOrderDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F4F6F9]">
-
-      {/* Sheet is a direct child of the page root — no overflow parent above it */}
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} />
-
       <AppHeader title="My Account" showCart />
 
       <main className="flex-1 max-w-2xl mx-auto w-full">
@@ -254,12 +306,8 @@ export default function AccountPage() {
 
           <div className="relative flex items-center gap-5">
             <div className="relative shrink-0">
-              {user?.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-[72px] h-[72px] rounded-full object-cover ring-4 ring-white/30 shadow-xl"
-                />
+              {user.avatar ? (
+                <img src={user.avatar} alt={user.name} className="w-[72px] h-[72px] rounded-full object-cover ring-4 ring-white/30 shadow-xl" />
               ) : (
                 <div className="w-[72px] h-[72px] rounded-full bg-accent text-primary text-[26px] font-extrabold flex items-center justify-center shadow-xl ring-4 ring-white/20">
                   {initial}
@@ -275,16 +323,11 @@ export default function AccountPage() {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-0.5">
-                <p className="text-[19px] font-bold text-white truncate">{user?.name}</p>
-                {user?.isVerified && <ShieldCheck size={16} className="text-accent shrink-0" />}
+                <p className="text-[19px] font-bold text-white truncate">{user.name}</p>
+                {user.isVerified && <ShieldCheck size={16} className="text-accent shrink-0" />}
               </div>
-              <p className="text-[13px] text-white/70 truncate">{user?.email}</p>
-              <p className="text-[13px] text-white/70">{user?.phone}</p>
-              {user?.location && (
-                <p className="text-[12px] text-white/50 flex items-center gap-1 mt-0.5">
-                  <MapPin size={11} /> {user.location}
-                </p>
-              )}
+              <p className="text-[13px] text-white/70 truncate">{user.email}</p>
+              {user.phone && <p className="text-[13px] text-white/70">{user.phone}</p>}
             </div>
 
             <button
@@ -295,28 +338,18 @@ export default function AccountPage() {
             </button>
           </div>
 
-          {user?.walletBalance !== undefined && (
-            <div className="mt-5 inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5">
-              <span className="text-[12px] text-white/70">Wallet Balance</span>
-              <span className="text-[14px] font-bold text-accent">{formatPrice(user.walletBalance)}</span>
-            </div>
-          )}
         </div>
 
-        {/* Stats card — z-10 keeps it above hero decorative elements */}
+        {/* Stats card */}
         <div className="px-4 -mt-8 relative z-10">
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
             <div className="grid grid-cols-3 divide-x divide-gray-100">
               {[
-                { label: 'In Cart',  value: totalItems,         href: '/cart' },
-                { label: 'Wishlist', value: 0,                  href: '/wishlist' },
-                { label: 'Orders',   value: MOCK_ORDERS.length, href: '/orders' },
+                { label: 'In Cart',  value: totalItems,    href: '/cart' },
+                { label: 'Wishlist', value: wishlistCount, href: '/wishlist' },
+                { label: 'Orders',   value: orders.length, href: '/orders' },
               ].map((stat) => (
-                <Link
-                  key={stat.label}
-                  href={stat.href}
-                  className="flex flex-col items-center py-4 gap-0.5 hover:bg-gray-50 transition-colors"
-                >
+                <Link key={stat.label} href={stat.href} className="flex flex-col items-center py-4 gap-0.5 hover:bg-gray-50 transition-colors">
                   <span className="text-[22px] font-extrabold text-primary">{stat.value}</span>
                   <span className="text-[12px] text-gray-500 font-medium">{stat.label}</span>
                 </Link>
@@ -328,17 +361,20 @@ export default function AccountPage() {
         {/* Content */}
         <div ref={cardsRef} className="px-4 py-5 flex flex-col gap-4">
 
-          {user?.role === 'customer' && (
-            <div className="bg-gradient-to-r from-primary to-[#0a5a8e] rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:opacity-95 transition-opacity">
+          {user.role === 'customer' && (
+            <button
+              onClick={() => router.push(`/auth?tab=vendor&next=${encodeURIComponent('/account')}`)}
+              className="w-full bg-gradient-to-r from-primary to-[#0a5a8e] rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:opacity-95 transition-opacity text-left"
+            >
               <div className="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
                 <Store size={22} className="text-white" />
               </div>
               <div className="flex-1">
                 <p className="text-[15px] font-bold text-white">Become a Vendor</p>
-                <p className="text-[12px] text-white/70">Start selling on D Mall today — it's free</p>
+                <p className="text-[12px] text-white/70">Start selling on D Mall today — it&apos;s free</p>
               </div>
               <ChevronRight size={20} className="text-white/60" />
-            </div>
+            </button>
           )}
 
           {/* Recent Orders */}
@@ -350,33 +386,46 @@ export default function AccountPage() {
               </div>
               <Link href="/orders" className="text-[13px] font-semibold text-primary hover:underline">View all</Link>
             </div>
-            {MOCK_ORDERS.map((order) => (
-              <Link
-                key={order.id}
-                href={`/orders/${order.id}`}
-                className="flex items-center gap-4 px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
-              >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: STATUS_BG[order.status] ?? '#F4F6F9' }}
+
+            {ordersLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={22} className="animate-spin text-primary" />
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="flex flex-col items-center py-8 gap-2">
+                <ShoppingBag size={32} className="text-gray-200" />
+                <p className="text-[13px] text-gray-400">No orders yet</p>
+                <Link href="/" className="text-[13px] font-semibold text-primary hover:underline">Start shopping</Link>
+              </div>
+            ) : (
+              orders.map((order) => (
+                <Link
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="flex items-center gap-4 px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
                 >
-                  <Truck size={18} style={{ color: STATUS_COLORS[order.status] ?? '#1A1A1A' }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold">{order.id}</p>
-                  <p className="text-[12px] text-gray-400">{order.date} · {order.items} item{order.items > 1 ? 's' : ''}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span className="text-[13px] font-bold">{formatPrice(order.total)}</span>
-                  <span
-                    className="text-[11px] font-semibold capitalize px-2 py-0.5 rounded-full"
-                    style={{ color: STATUS_COLORS[order.status], background: STATUS_BG[order.status] }}
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: STATUS_BG[order.status] ?? '#F4F6F9' }}
                   >
-                    {order.status}
-                  </span>
-                </div>
-              </Link>
-            ))}
+                    <Truck size={18} style={{ color: STATUS_COLORS[order.status] ?? '#1A1A1A' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-semibold">{order.order_number}</p>
+                    <p className="text-[12px] text-gray-400">{formatOrderDate(order.created_at)} · {order.item_count} item{order.item_count !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[13px] font-bold">{formatPrice(parseFloat(order.total_amount))}</span>
+                    <span
+                      className="text-[11px] font-semibold capitalize px-2 py-0.5 rounded-full"
+                      style={{ color: STATUS_COLORS[order.status], background: STATUS_BG[order.status] }}
+                    >
+                      {order.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </Link>
+              ))
+            )}
           </div>
 
           <MenuSection label="Account">
@@ -386,13 +435,13 @@ export default function AccountPage() {
           </MenuSection>
 
           <MenuSection label="Shopping">
-            <MenuItem icon={<Heart size={17} />}       label="Wishlist"          badge="0" href="/wishlist" />
-            <MenuItem icon={<ShoppingBag size={17} />} label="My Orders"                  href="/orders" />
-            <MenuItem icon={<RotateCcw size={17} />}   label="Returns & Refunds"           href="/returns" />
+            <MenuItem icon={<Heart size={17} />}       label="Wishlist"          href="/wishlist" />
+            <MenuItem icon={<ShoppingBag size={17} />} label="My Orders"         href="/orders" />
+            <MenuItem icon={<RotateCcw size={17} />}   label="Returns & Refunds" href="/returns" />
           </MenuSection>
 
           <MenuSection label="Settings & Support">
-            <MenuItem icon={<Bell size={17} />} label="Notifications" href="/account/notifications" />
+            <MenuItem icon={<Bell size={17} />}        label="Notifications" href="/account/notifications" />
             <MenuItem
               icon={<img src="/support-icon.png" alt="" width={19} height={19} />}
               label="Help & Support"
@@ -402,7 +451,7 @@ export default function AccountPage() {
           </MenuSection>
 
           <button
-            onClick={() => { clearAuth(); router.push('/'); }}
+            onClick={handleLogout}
             className="w-full flex items-center gap-4 bg-red-50 border border-red-100 rounded-2xl px-5 py-4 hover:bg-red-100 transition-colors"
           >
             <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
@@ -432,8 +481,8 @@ function MenuSection({ label, children }: { label: string; children: React.React
   );
 }
 
-function MenuItem({ icon, label, sub, badge, href, onClick }: {
-  icon: React.ReactNode; label: string; sub?: string; badge?: string; href?: string; onClick?: () => void;
+function MenuItem({ icon, label, sub, href, onClick }: {
+  icon: React.ReactNode; label: string; sub?: string; href?: string; onClick?: () => void;
 }) {
   const inner = (
     <>
@@ -444,18 +493,11 @@ function MenuItem({ icon, label, sub, badge, href, onClick }: {
         <p className="text-[14px] font-semibold text-text-primary">{label}</p>
         {sub && <p className="text-[12px] text-gray-400 mt-0.5">{sub}</p>}
       </div>
-      {badge !== undefined ? (
-        <span className="text-[12px] bg-primary text-white font-bold px-2.5 py-0.5 rounded-full">{badge}</span>
-      ) : (
-        <ChevronRight size={16} className="text-gray-300 shrink-0" />
-      )}
+      <ChevronRight size={16} className="text-gray-300 shrink-0" />
     </>
   );
-
   const cls = 'w-full flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left';
-
-  if (href) {
-    return <Link href={href} className={cls}>{inner}</Link>;
-  }
-  return <button onClick={onClick} className={cls}>{inner}</button>;
+  return href
+    ? <Link href={href} className={cls}>{inner}</Link>
+    : <button onClick={onClick} className={cls}>{inner}</button>;
 }
