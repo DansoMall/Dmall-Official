@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { Package, Truck, ChevronRight, ShoppingBag, Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
@@ -37,7 +37,7 @@ interface ApiOrder {
   first_item?: { name: string; image: string | null };
 }
 
-export default function OrdersPage() {
+function OrdersContent() {
   const isAuth = useRequireAuth();
   const [orders,  setOrders]  = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,5 +126,17 @@ export default function OrdersPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-primary" />
+      </div>
+    }>
+      <OrdersContent />
+    </Suspense>
   );
 }

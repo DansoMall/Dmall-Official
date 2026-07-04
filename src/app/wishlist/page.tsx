@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { Heart, Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
@@ -12,7 +12,7 @@ import type { ApiProduct } from '@/utils/api';
 import { toProduct } from '@/utils/api';
 import { apiGet } from '@/utils/apiClient';
 
-export default function WishlistPage() {
+function WishlistContent() {
   const isAuthenticated = useRequireAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,5 +74,17 @@ export default function WishlistPage() {
       </main>
       <Footer />
     </div>
+  );
+}
+
+export default function WishlistPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-primary" />
+      </div>
+    }>
+      <WishlistContent />
+    </Suspense>
   );
 }

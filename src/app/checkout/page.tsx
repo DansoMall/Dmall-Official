@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Briefcase, Check, Home, Loader2, MapPin, Plus, Receipt, AlertCircle } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import PrimaryButton from '@/components/PrimaryButton';
@@ -42,7 +42,7 @@ interface SavedAddress {
 
 const emptyAddress = { name: '', phone: '', street: '', city: '', region: '' };
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router  = useRouter();
   const { items, subtotal, clearCart } = useCartStore();
   const { accessToken } = useAuthStore();
@@ -443,5 +443,17 @@ export default function CheckoutPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-primary" />
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 }

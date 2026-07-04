@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useState, Suspense } from 'react';
 import { CalendarDays, CheckCircle2, Headphones, Loader2, MapPin, Package, Receipt, RefreshCw, Star } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import AppHeader from '@/components/AppHeader';
@@ -65,8 +65,7 @@ function deliveryLabel(value: string) {
   return value === 'door' ? 'Door Delivery' : value === 'station' ? 'Station Pickup' : paymentLabel(value);
 }
 
-export default function OrderTrackingPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+function OrderTrackingContent({ id }: { id: string }) {
   const router = useRouter();
   const isAuthenticated = useRequireAuth();
   const [order, setOrder] = useState<ApiOrderDetail | null>(null);
@@ -364,5 +363,18 @@ export default function OrderTrackingPage({ params }: { params: Promise<{ id: st
 
       <Footer />
     </div>
+  );
+}
+
+export default function OrderTrackingPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-primary" />
+      </div>
+    }>
+      <OrderTrackingContent id={id} />
+    </Suspense>
   );
 }
