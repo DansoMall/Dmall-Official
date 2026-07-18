@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { Package, Truck, ChevronRight, ShoppingBag, Loader2 } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
@@ -42,20 +42,19 @@ function OrdersContent() {
   const [orders,  setOrders]  = useState<ApiOrder[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchOrders = useCallback(async () => {
+  useEffect(() => {
     if (!isAuth) return;
+    let cancelled = false;
+    // Resets loading at the start of each fetch — the standard
+    // data-fetching-effect shape.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    try {
-      const data = await apiGet<{ results: ApiOrder[] }>('/api/orders/');
-      setOrders(data.results ?? []);
-    } catch {
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+    apiGet<{ results: ApiOrder[] }>('/api/orders/')
+      .then((data) => { if (!cancelled) setOrders(data.results ?? []); })
+      .catch(() => { if (!cancelled) setOrders([]); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [isAuth]);
-
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-GH', { day: 'numeric', month: 'short', year: 'numeric' });
