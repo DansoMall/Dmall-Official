@@ -19,6 +19,9 @@ function useFetch<T>(fetcher: () => Promise<T>, deps: unknown[] = []): FetchStat
 
   useEffect(() => {
     let cancelled = false;
+    // Resets loading/error at the start of each fetch (including refetches
+    // triggered by deps changing) — the standard data-fetching-effect shape.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
     fetcher()
@@ -73,7 +76,7 @@ export function useProductSearch(query: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!query.trim()) { setProducts([]); return; }
+    if (!query.trim()) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       setLoading(true);
@@ -85,7 +88,9 @@ export function useProductSearch(query: string) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [query]);
 
-  return { products, loading, error };
+  // Derived rather than cleared via setState: avoids a synchronous setState
+  // in the effect above when the query is emptied.
+  return { products: query.trim() ? products : [], loading, error };
 }
 
 export function useProductDetail(id: string) {

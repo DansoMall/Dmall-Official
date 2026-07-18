@@ -11,27 +11,29 @@ function CallbackContent() {
   const router  = useRouter();
   const { accessToken } = useAuthStore();
 
-  const [hydrated, setHydrated]   = useState(false);
-  const [status, setStatus]       = useState<'verifying' | 'success' | 'failed'>('verifying');
+  const reference = params.get('reference') ?? params.get('trxref') ?? '';
+
+  // Lazy initializers run during render (including SSR, where persist has no
+  // storage to read and must stay false), so on the client hydration state
+  // and the no-reference case are reflected immediately instead of via a
+  // synchronous setState in an effect.
+  const [hydrated, setHydrated]   = useState(
+    () => typeof window !== 'undefined' && useAuthStore.persist.hasHydrated(),
+  );
+  const [status, setStatus]       = useState<'verifying' | 'success' | 'failed'>(() => reference ? 'verifying' : 'failed');
   const [orderId, setOrderId]     = useState<number | null>(null);
   const [orderNum, setOrderNum]   = useState('');
 
   // Wait for Zustand to restore the token from localStorage before calling the API.
   // Without this, accessToken is null on first render and the verify request gets a 401.
   useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true);
-    } else {
-      const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
-      return unsub;
-    }
-  }, []);
+    if (hydrated) return;
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, [hydrated]);
 
   useEffect(() => {
-    if (!hydrated) return;
-
-    const reference = params.get('reference') ?? params.get('trxref') ?? '';
-    if (!reference) { setStatus('failed'); return; }
+    if (!hydrated || !reference) return;
 
     verifyPayment(reference, accessToken ?? '')
       .then((res) => {
@@ -44,7 +46,7 @@ function CallbackContent() {
         }
       })
       .catch(() => setStatus('failed'));
-  }, [hydrated, params, accessToken]);
+  }, [hydrated, reference, accessToken]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 text-center gap-6">

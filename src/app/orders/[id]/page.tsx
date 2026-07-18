@@ -93,6 +93,9 @@ function OrderTrackingContent({ id }: { id: string }) {
   useEffect(() => {
     if (!isAuthenticated) return;
     let cancelled = false;
+    // Resets loading at the start of each fetch (including refetches when
+    // id/isAuthenticated change) — the standard data-fetching-effect shape.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     apiGet<ApiOrderDetail>(`/api/orders/${id}/`)
       .then((data)  => { if (!cancelled) setOrder(data); })
